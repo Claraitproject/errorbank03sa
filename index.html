@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Найдите проблему на схеме процесса</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --accent:#7C6FF5;
+    --accent-hover:#6658E0;
+    --accent-light:#F1EEFE;
+    --accent-light-border:#DCD5FC;
+    --ink:#1F2430;
+    --ink-soft:#4B5160;
+    --gray:#6B7280;
+    --border:#E6E7EC;
+    --good:#2F9E5C;
+    --good-bg:#EAF8F0;
+    --good-border:#BEE9D0;
+    --bad-bg:#FDEEEE;
+    --bad-border:#F5C9C7;
+    --bad-text:#C13A34;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    background:#fff;
+    color:var(--ink);
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:880px; margin:0 auto; padding:36px 24px 60px;}
+  .tag-row{display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap;}
+  .tag{
+    font-size:12.5px; font-weight:600; padding:5px 12px; border-radius:999px;
+    background:var(--accent-light); color:var(--accent-hover); border:1px solid var(--accent-light-border);
+  }
+  .tag.muted{background:#F5F5F7; color:var(--gray); border-color:#E6E7EC;}
+  h1{font-size:26px; font-weight:800; margin:0 0 10px; letter-spacing:-0.01em;}
+  .lead{color:var(--ink-soft); font-size:15px; margin:0 0 26px; max-width:660px;}
+  .doc-card{
+    border:1px solid var(--border);
+    border-radius:14px;
+    box-shadow:0 1px 2px rgba(20,20,43,0.04), 0 8px 24px rgba(20,20,43,0.05);
+    overflow:hidden;
+    background:#fff;
+  }
+  .doc-header{
+    background:#FAFAFC;
+    border-bottom:1px solid var(--border);
+    padding:14px 22px;
+    font-family:'JetBrains Mono',monospace;
+    font-size:12.5px;
+    color:var(--gray);
+    display:flex;
+    justify-content:space-between;
+  }
+  .doc-body{padding:24px 20px 12px;}
+  .doc-title{
+    font-size:14px;
+    font-weight:700;
+    color:var(--ink);
+    margin:0 0 16px;
+    padding-bottom:12px;
+    border-bottom:1px solid var(--border);
+  }
+
+  .diagram-wrap{position:relative; width:100%;}
+  svg{width:100%; height:auto; display:block; overflow:visible;}
+
+  .node rect, .node circle, .node polygon{
+    fill:#fff;
+    stroke:#B9BCC6;
+    stroke-width:1.6;
+    transition:stroke .15s ease, fill .15s ease;
+  }
+  .node{cursor:pointer;}
+  .node:hover:not(.locked) rect,
+  .node:hover:not(.locked) circle,
+  .node:hover:not(.locked) polygon{
+    stroke:var(--accent);
+    fill:var(--accent-light);
+  }
+  .node text{
+    font-family:'Inter',sans-serif;
+    fill:var(--ink);
+    pointer-events:none;
+  }
+  .node.correct.solved rect,
+  .node.correct.solved circle,
+  .node.correct.solved polygon{
+    stroke:var(--good);
+    stroke-width:2.2;
+    fill:var(--good-bg);
+  }
+  .node.wrong-flash rect,
+  .node.wrong-flash circle,
+  .node.wrong-flash polygon{
+    stroke:var(--bad-text);
+    fill:var(--bad-bg);
+  }
+  .edge{
+    stroke:#B9BCC6;
+    stroke-width:1.6;
+    fill:none;
+    marker-end:url(#arrow);
+  }
+  .edge-label{
+    font-family:'Inter',sans-serif;
+    font-size:13px;
+    fill:var(--ink-soft);
+    font-weight:600;
+  }
+
+  .hint-bubble{
+    position:absolute;
+    background:var(--bad-text);
+    color:#fff;
+    font-size:12.5px;
+    font-weight:600;
+    padding:8px 13px;
+    border-radius:8px;
+    transform:translate(-50%, -112%);
+    pointer-events:none;
+    max-width:260px;
+    text-align:center;
+    display:none;
+    z-index:5;
+    line-height:1.35;
+  }
+  .hint-bubble::after{
+    content:"";
+    position:absolute;
+    left:50%;
+    top:100%;
+    transform:translateX(-50%);
+    border:6px solid transparent;
+    border-top-color:var(--bad-text);
+  }
+
+  .toolbar{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-top:8px;
+    padding-top:14px;
+    border-top:1px solid var(--border);
+  }
+  .attempts{font-size:13px; color:var(--gray);}
+  .btn{
+    background:none;
+    border:1.5px solid var(--accent-light-border);
+    color:var(--accent-hover);
+    font-family:inherit;
+    font-weight:600;
+    font-size:13.5px;
+    padding:9px 16px;
+    border-radius:8px;
+    cursor:pointer;
+    transition:background .15s ease;
+  }
+  .btn:hover{background:var(--accent-light);}
+  .btn.primary{background:var(--accent); color:#fff; border-color:var(--accent);}
+  .btn.primary:hover{background:var(--accent-hover);}
+
+  .reveal{display:none; margin-top:24px; animation:fadein .3s ease;}
+  @keyframes fadein{from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:translateY(0);}}
+  .reveal-card{
+    border:1px solid var(--good-border);
+    background:var(--good-bg);
+    border-radius:14px;
+    padding:22px 24px;
+  }
+  .reveal-label{
+    font-size:12.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.03em;
+    color:var(--good); margin-bottom:10px;
+  }
+  .reveal-text{font-size:14.5px; color:var(--ink); margin:0 0 16px;}
+  .fix-box{
+    background:#fff; border:1px solid var(--border); border-radius:10px;
+    padding:14px 16px; font-size:14px; margin-bottom:10px;
+  }
+  .fix-box .label{font-size:12px; font-weight:700; color:var(--gray); text-transform:uppercase; letter-spacing:0.02em; margin-bottom:6px;}
+  .fix-box.was{border-left:3px solid var(--bad-text);}
+  .fix-box.now{border-left:3px solid var(--good);}
+  .lesson-ref{font-size:13px; color:var(--ink-soft); margin-top:14px;}
+  .footer-btn{margin-top:22px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="tag-row">
+    <span class="tag">SA-I-004 · Моделирование данных и процессов</span>
+    <span class="tag muted">Карточка 3 из 10 · формат: диаграмма</span>
+  </div>
+  <h1>Найдите проблему на схеме процесса</h1>
+  <p class="lead">
+    Ниже — фрагмент BPMN-схемы процесса оплаты заказа в FoodMart. Эту схему аналитик
+    отдал в разработку без вопросов — обе ветки доведены до завершающего события,
+    на первый взгляд всё аккуратно. Но один из шагов имеет последствие, которое легко
+    не заметить. Кликните на элемент, где кроется проблема.
+  </p>
+
+  <div class="doc-card">
+    <div class="doc-header">
+      <span>BP_FoodMart_Payment_v1.2.vsdx</span>
+      <span>Процесс «Оплата заказа»</span>
+    </div>
+    <div class="doc-body">
+      <p class="doc-title">Диаграмма процесса: Оплата заказа</p>
+
+      <div class="diagram-wrap">
+        <div class="hint-bubble" id="hint-bubble"></div>
+        <svg viewBox="0 0 980 340" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="arrow" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+              <path d="M0,0 L7,3 L0,6 Z" fill="#B9BCC6"></path>
+            </marker>
+          </defs>
+
+          <!-- edges -->
+          <path class="edge" d="M56,170 L80,170"></path>
+          <path class="edge" d="M210,170 L230,170"></path>
+          <path class="edge" d="M370,170 L390,170"></path>
+          <path class="edge" d="M530,170 L550,170"></path>
+          <path class="edge" d="M590,140 L590,110 L660,110"></path>
+          <text class="edge-label" x="598" y="128">Да</text>
+          <path class="edge" d="M830,110 L900,110 L900,154"></path>
+          <path class="edge" d="M590,200 L590,280 L660,280"></path>
+          <text class="edge-label" x="598" y="245">Нет</text>
+          <path class="edge" d="M850,280 L899,280"></path>
+
+          <!-- start event -->
+          <g class="node" data-correct="false" data-hint="Старт процесса — с ним всё в порядке." onclick="handleClick(this)">
+            <circle cx="40" cy="170" r="16"></circle>
+            <text x="40" y="204" font-size="11" text-anchor="middle" fill="#6B7280">Клиент нажал</text>
+            <text x="40" y="217" font-size="11" text-anchor="middle" fill="#6B7280">«Оплатить»</text>
+          </g>
+
+          <!-- task A: card input -->
+          <g class="node" data-correct="false" data-hint="Шаг описан корректно и идёт до проверки платежа — проблема не здесь." onclick="handleClick(this)">
+            <rect x="80" y="140" width="130" height="60" rx="10"></rect>
+            <text x="145" y="165" font-size="12" text-anchor="middle" font-weight="600">Клиент вводит</text>
+            <text x="145" y="182" font-size="12" text-anchor="middle" font-weight="600">данные карты</text>
+          </g>
+
+          <!-- task A2: stock reservation -->
+          <g class="node" data-correct="false" data-hint="Резервирование товара до оплаты — обычная практика, чтобы не продать последнюю единицу дважды, пока клиент вводит карту. Сам этот шаг не ошибка." onclick="handleClick(this)">
+            <rect x="230" y="140" width="140" height="60" rx="10"></rect>
+            <text x="300" y="162" font-size="11.5" text-anchor="middle" font-weight="600">Система резервирует</text>
+            <text x="300" y="179" font-size="11.5" text-anchor="middle" font-weight="600">товар на складе</text>
+          </g>
+
+          <!-- task B: payment gateway request -->
+          <g class="node" data-correct="false" data-hint="Стандартный шаг интеграции с платёжным шлюзом, проблемы здесь нет." onclick="handleClick(this)">
+            <rect x="390" y="140" width="140" height="60" rx="10"></rect>
+            <text x="460" y="162" font-size="12" text-anchor="middle" font-weight="600">Запрос к</text>
+            <text x="460" y="179" font-size="12" text-anchor="middle" font-weight="600">платёжному шлюзу</text>
+          </g>
+
+          <!-- gateway -->
+          <g class="node" data-correct="false" data-hint="Сама развилка задана верно — у платежа действительно два исхода. Проверьте, что происходит с уже выполненными действиями на каждой из веток." onclick="handleClick(this)">
+            <polygon points="590,140 630,170 590,200 550,170"></polygon>
+            <text x="590" y="222" font-size="12" text-anchor="middle" font-weight="600">Платёж прошёл?</text>
+          </g>
+
+          <!-- task C: confirm order (yes branch) -->
+          <g class="node" data-correct="false" data-hint="Ветка «Да» в порядке — она доводит процесс до успешного завершения." onclick="handleClick(this)">
+            <rect x="660" y="80" width="170" height="60" rx="10"></rect>
+            <text x="745" y="105" font-size="12" text-anchor="middle" font-weight="600">Подтвердить заказ,</text>
+            <text x="745" y="122" font-size="12" text-anchor="middle" font-weight="600">запустить сборку</text>
+          </g>
+
+          <!-- end event 1 -->
+          <g class="node" data-correct="false" data-hint="Завершение успешного сценария оформлено верно." onclick="handleClick(this)">
+            <circle cx="900" cy="170" r="16"></circle>
+            <text x="900" y="204" font-size="11" text-anchor="middle" fill="#6B7280">Заказ</text>
+            <text x="900" y="217" font-size="11" text-anchor="middle" fill="#6B7280">оформлен</text>
+          </g>
+
+          <!-- task D: notify failure (no branch) — THE ANSWER -->
+          <g class="node" data-correct="true" onclick="handleClick(this)">
+            <rect x="660" y="250" width="190" height="60" rx="10"></rect>
+            <text x="755" y="275" font-size="12" text-anchor="middle" font-weight="600">Уведомить клиента</text>
+            <text x="755" y="292" font-size="12" text-anchor="middle" font-weight="600">об ошибке оплаты</text>
+          </g>
+
+          <!-- end event 2 -->
+          <g class="node" data-correct="false" data-hint="Событие завершения оформлено корректно. Проблема не в том, как процесс заканчивается, а в том, что осталось «висеть» с предыдущего шага." onclick="handleClick(this)">
+            <circle cx="915" cy="280" r="16"></circle>
+            <text x="915" y="314" font-size="11" text-anchor="middle" fill="#6B7280">Заказ не</text>
+            <text x="915" y="327" font-size="11" text-anchor="middle" fill="#6B7280">оформлен</text>
+          </g>
+
+        </svg>
+      </div>
+    </div>
+
+    <div class="doc-body" style="padding-top:0;">
+      <div class="toolbar">
+        <span class="attempts" id="attempts-label">Попыток: 0</span>
+        <button class="btn" onclick="giveUp()">Показать разбор</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="reveal" id="reveal">
+    <div class="reveal-card">
+      <div class="reveal-label">✓ Проблема найдена — ветка «Нет»</div>
+      <p class="reveal-text">
+        Обе ветки доходят до завершающего события, и формально диаграмма выглядит полной.
+        Но до развилки система уже зарезервировала товар на складе — а по ветке «Нет»
+        резерв нигде не снимается. Если оплата не прошла, товар остаётся заблокированным
+        на складе бессрочно, хотя заказ так и не оформлен: другие покупатели не смогут
+        купить последнюю единицу, которая на самом деле никому не продана.
+      </p>
+      <div class="fix-box was">
+        <div class="label">Было</div>
+        Ветка «Нет» → «Уведомить клиента об ошибке» → «Заказ не оформлен». Резерв товара не упоминается.
+      </div>
+      <div class="fix-box now">
+        <div class="label">Как поправить</div>
+        Параллельно с уведомлением клиента добавить шаг «Снять резерв товара на складе»,
+        чтобы неудачная попытка оплаты не блокировала остаток для других покупателей.
+      </div>
+      <p class="lesson-ref">
+        Разбирается в модуле SA-I-004 (нотация BPMN) — полнота диаграммы это не только
+        «у каждой ветки есть продолжение», но и «на каждой ветке отменены все действия
+        с побочным эффектом, которые были выполнены раньше». Смежная тема — работа
+        с исключительными сценариями, модуль SA-I-003, урок 4.
+      </p>
+      <div class="footer-btn">
+        <button class="btn primary" onclick="location.reload()">Попробовать ещё раз</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+let attempts = 0;
+let solved = false;
+const hintBubble = document.getElementById('hint-bubble');
+
+function handleClick(el){
+  if(solved) return;
+  attempts++;
+  document.getElementById('attempts-label').textContent = `Попыток: ${attempts}`;
+
+  document.querySelectorAll('.node').forEach(n => n.classList.remove('wrong-flash'));
+
+  if(el.dataset.correct === 'true'){
+    solved = true;
+    el.classList.add('correct', 'solved');
+    document.querySelectorAll('.node').forEach(n => n.classList.add('locked'));
+    hintBubble.style.display = 'none';
+    document.getElementById('reveal').style.display = 'block';
+    document.getElementById('reveal').scrollIntoView({behavior:'smooth', block:'nearest'});
+  } else {
+    el.classList.add('wrong-flash');
+    showHint(el);
+  }
+}
+
+function showHint(el){
+  const bbox = el.getBoundingClientRect();
+  const wrapBox = document.querySelector('.diagram-wrap').getBoundingClientRect();
+  hintBubble.textContent = el.dataset.hint || 'Здесь всё в порядке — попробуйте другой элемент.';
+  hintBubble.style.left = (bbox.left - wrapBox.left + bbox.width/2) + 'px';
+  hintBubble.style.top = (bbox.top - wrapBox.top) + 'px';
+  hintBubble.style.display = 'block';
+  clearTimeout(window._hintTimer);
+  window._hintTimer = setTimeout(() => { hintBubble.style.display = 'none'; }, 2600);
+}
+
+function giveUp(){
+  if(solved) return;
+  solved = true;
+  document.querySelectorAll('.node').forEach(n => {
+    n.classList.remove('wrong-flash');
+    if(n.dataset.correct === 'true') n.classList.add('correct', 'solved');
+    n.classList.add('locked');
+  });
+  hintBubble.style.display = 'none';
+  document.getElementById('reveal').style.display = 'block';
+  document.getElementById('reveal').scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+</script>
+</body>
+</html>
